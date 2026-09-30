@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Interactive NLP blog: how word embeddings, LSTMs and transformers read customer reviews."><title>What Customers Really Mean: From Word Embeddings to Transformers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700;800&family=IBM+Plex+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f2f5fa;--card:#fff;--ink:#16213a;--mute:#5b6784;--line:#d9e0ee;--pos:#0b8a6f;--neg:#d23b4a;--acc:#3b5bdb;--posbg:#d7f3ea;--negbg:#fbdde0;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1524;--card:#182036;--ink:#e8edf8;--mute:#9aa7c4;--line:#2a3554;--pos:#3ddbb0;--neg:#ff7a86;--acc:#8ea2ff;--posbg:#12372f;--negbg:#40202a}}
+:root[data-theme="dark"]{--bg:#0f1524;--card:#182036;--ink:#e8edf8;--mute:#9aa7c4;--line:#2a3554;--pos:#3ddbb0;--neg:#ff7a86;--acc:#8ea2ff;--posbg:#12372f;--negbg:#40202a}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.65 "IBM Plex Sans",system-ui,sans-serif}
+main{max-width:760px;margin:0 auto;padding:40px 20px 80px}
+h1,h2{font-family:"Bricolage Grotesque",system-ui,sans-serif;line-height:1.1;letter-spacing:-.02em}
+h1{font-size:clamp(34px,7vw,54px);margin:0 0 14px;font-weight:800}
+h2{font-size:clamp(26px,4.5vw,34px);margin:64px 0 6px;font-weight:700}
+.tag{color:var(--mute);font-size:14px;margin:0 0 14px}
+p{margin:0 0 14px;max-width:68ch}
+.lead{font-size:19px;color:var(--mute)}
+.demo{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin:20px 0}
+.demo h3{margin:0 0 4px;font:700 17px "Bricolage Grotesque",sans-serif}
+.hint{color:var(--mute);font-size:14px;margin:0 0 12px}
+textarea{width:100%;font:inherit;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);resize:vertical;min-height:70px}
+button{font:inherit;font-size:14px;padding:7px 12px;border-radius:999px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer}
+button:hover{border-color:var(--acc)}
+button:focus-visible,textarea:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+button.on{background:var(--acc);border-color:var(--acc);color:#fff}
+.row{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+.chip{padding:3px 9px;border-radius:8px;background:var(--bg);border:1px solid var(--line);transition:background .3s,transform .3s}
+.chip.pos{background:var(--posbg);border-color:var(--pos);color:var(--pos)}
+.chip.neg{background:var(--negbg);border-color:var(--neg);color:var(--neg)}
+.chip.cur{transform:translateY(-4px);box-shadow:0 0 0 2px var(--acc)}
+.meter{position:relative;height:14px;background:var(--bg);border:1px solid var(--line);border-radius:8px;overflow:hidden;margin:12px 0 6px}
+.meter i{position:absolute;top:0;bottom:0;transition:left .5s,width .5s,background .5s}
+.meter:after{content:"";position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--mute)}
+.verdict{font:700 20px "Bricolage Grotesque",sans-serif}
+.note{color:var(--mute);font-size:14px;min-height:22px}
+svg{width:100%;height:auto;display:block;background:var(--bg);border-radius:10px;border:1px solid var(--line)}
+.pt{cursor:pointer}.pt text{font:11px "IBM Plex Sans",sans-serif;fill:var(--ink)}
+.ln{stroke:var(--acc);stroke-width:1.6;stroke-dasharray:400;stroke-dashoffset:400;animation:draw .7s forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+.tok{display:flex;flex-direction:column;align-items:center;gap:2px}
+.tok button{border-radius:8px}
+.tok small{color:var(--mute);font-size:12px;height:16px}
+.bar{height:22px;background:var(--bg);border:1px solid var(--line);border-radius:6px;overflow:hidden;margin:6px 0}
+.bar i{display:block;height:100%;width:0;background:var(--acc);transition:width 1.1s cubic-bezier(.2,.7,.2,1);color:#fff;font-size:13px;padding-left:8px;line-height:20px;white-space:nowrap}
+.lab{display:flex;justify-content:space-between;font-size:14px;margin-top:8px}
+ul{padding-left:20px;max-width:68ch}li{margin-bottom:6px}
+body{background-image:radial-gradient(60vw 40vh at 85% -5%,color-mix(in srgb,var(--acc) 16%,transparent),transparent),radial-gradient(50vw 40vh at -5% 30%,color-mix(in srgb,var(--pos) 12%,transparent),transparent);background-attachment:fixed}
+.demo{border-left:4px solid var(--acc);box-shadow:0 10px 30px -20px rgba(20,30,70,.45)}
+h2::before{content:"";display:block;width:36px;height:4px;border-radius:2px;background:var(--acc);margin-bottom:12px}
+#prog{position:fixed;top:0;left:0;height:3px;width:0;background:var(--acc);z-index:9}
+#theme{position:fixed;top:calc(12px + env(safe-area-inset-top,0px));right:14px;z-index:9;background:var(--card)}
+nav.toc{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0}
+nav.toc a{font-size:14px;color:var(--ink);text-decoration:none;padding:5px 11px;border:1px solid var(--line);border-radius:999px;background:var(--card)}
+nav.toc a:hover{border-color:var(--acc)}
+input[type=text]{width:100%;font:inherit;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);margin:4px 0}
+.e{padding:1px 6px;border-radius:6px;font-weight:500}.e small{font-size:11px;color:var(--mute);margin-left:4px}
+.e-b{background:color-mix(in srgb,var(--acc) 25%,transparent)}.e-c{background:color-mix(in srgb,#f59e0b 35%,transparent)}.e-s{background:color-mix(in srgb,var(--pos) 28%,transparent)}
+#nout{font-size:18px;line-height:2;margin:8px 0}
+pre{background:#0f1524;color:#e8edf8;padding:14px;border-radius:10px;overflow-x:auto;font-size:13.5px;line-height:1.5;margin:6px 0 16px}
+footer{margin-top:60px;padding-top:18px;border-top:1px solid var(--line);color:var(--mute);font-size:14px}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation-duration:.01ms!important}}
+</style>
+</head>
+<body>
+<div id="prog"></div><button id="theme" aria-label="Toggle light or dark theme">🌓</button>
+<main>
+<h1>What customers really mean when they write a review</h1>
+<p class="lead">A five-star rating says "happy". A review says <em>why</em>. Type any product review below and watch a tiny sentiment model read it, then keep scrolling to see how modern NLP does the same job much better.</p>
+
+<nav class="toc"><a href="#hero">Analyzer</a><a href="#embed">Embeddings</a><a href="#lstm">LSTM</a><a href="#attn">Attention</a><a href="#ner">NER</a><a href="#compare">Compare</a><a href="#code">Code</a></nav>
+<div class="demo" id="hero">
+  <h3>Try it: live review analyzer</h3>
+  <p class="hint">A rule-based demo with a small word list and negation handling. It is a teaching model, not a trained one.</p>
+  <textarea id="inp" aria-label="Product review">Camera is great but the battery drains fast</textarea>
+  <div class="row" id="presets"></div>
+  <div class="row" id="chips" aria-live="polite"></div>
+  <div class="meter"><i id="fill"></i></div>
+  <div class="lab"><span>Negative</span><span class="verdict" id="verdict"></span><span>Positive</span></div>
+  <div class="note" id="hnote"></div>
+</div>
+
+<h2 id="embed">1. Words become numbers</h2>
+<p class="tag">Syllabus: 3.4 Semantic similarity, 3.5 Vector space models, 4.4 Word2Vec and GloVe</p>
+<p>Computers cannot compare "charging" and "battery" as text. A word embedding gives each word a list of numbers so that words used in similar contexts land close together. Word2Vec and GloVe learn these positions from huge amounts of text, and similarity is then just distance (or the angle between vectors).</p>
+<div class="demo">
+  <h3>Explore the vector space</h3>
+  <p class="hint">Tap a word to see its three nearest neighbours. Positions are hand-placed for illustration; real embeddings have 100 to 300 dimensions and are squashed to 2D for plots like this.</p>
+  <svg id="emb" viewBox="0 0 400 260" role="img" aria-label="Word embedding map"></svg>
+  <div class="note" id="enote"></div>
+</div>
+<p>This is why a search for "running shoes" can also surface "jogging sneakers", and why "battery drains fast" and "poor battery life" get grouped as the same complaint.</p>
+
+<div class="demo">
+  <h3>Same meaning, different words</h3>
+  <p class="hint">Plain word overlap misses that "drains" and "poor" are both complaints. Meaning-aware vectors catch it. A tiny hand-made table stands in for real embeddings here.</p>
+  <input type="text" id="sa" value="battery drains fast" aria-label="Phrase A">
+  <input type="text" id="sb" value="poor battery life" aria-label="Phrase B">
+  <div class="lab"><span>Plain word overlap</span><b id="s1"></b></div><div class="bar"><i id="b1"></i></div>
+  <div class="lab"><span>Meaning-aware vectors</span><b id="s2"></b></div><div class="bar"><i id="b2"></i></div>
+</div>
+<h2 id="lstm">2. Reading in order: RNNs and LSTMs</h2>
+<p class="tag">Syllabus: 4.5 RNN, LSTM, GRU</p>
+<p>Averaging word vectors ignores order, so "not good" looks a lot like "good". An LSTM reads one word at a time and carries a memory forward, so it can remember that "not" appeared and flip the next opinion word.</p>
+<div class="demo">
+  <h3>Step through a sentence</h3>
+  <p class="hint">A simplified picture of the memory, not real LSTM weights.</p>
+  <div class="row" id="ltoks"></div>
+  <div class="row"><button id="lnext">Next word</button><button id="lplay">Play</button><button id="lreset">Reset</button></div>
+  <div class="lab"><span>Negative memory</span><span>Positive memory</span></div>
+  <div class="meter"><i id="lfill"></i></div>
+  <div class="note" id="lnote">Press "Next word" to start.</div>
+</div>
+
+<h2 id="attn">3. Looking everywhere at once: Transformers</h2>
+<p class="tag">Syllabus: 4.5 Transformers, 3.3 Word sense disambiguation</p>
+<p>RNNs struggle when the clue is far away. A transformer uses attention: every word scores how much every other word matters to it. That is also how it tells "apple" the phone from "apple" the fruit, by attending to the words around it.</p>
+<div class="demo">
+  <h3>Click a word to see what it attends to</h3>
+  <p class="hint">Weights are illustrative. Darker means more attention.</p>
+  <div class="row" id="att"></div>
+  <div class="note" id="anote"></div>
+</div>
+
+<h2 id="ner">4. Pulling facts out of messy titles</h2>
+<p class="tag">Syllabus: 4.2 Unstructured data, 4.7 Named entity recognition</p>
+<p>Product titles are unstructured text. Named entity recognition tags the pieces that matter, such as brand, colour and size, so a catalogue can be filtered and cleaned automatically.</p>
+<div class="demo">
+  <h3>Tag a product title</h3>
+  <p class="hint">Dictionary and pattern based for the demo. Real systems use trained NER models such as spaCy.</p>
+  <input type="text" id="ninp" value="Nike Air Zoom Pegasus running shoes, size 9, black" aria-label="Product title">
+  <div class="row" id="npre"></div>
+  <div id="nout" aria-live="polite"></div>
+</div>
+<h2 id="compare">5. Which model should an analyst pick?</h2>
+<p class="tag">Syllabus: 4.5, 4.7 Sentiment analysis</p>
+<p>A typical experiment on a labelled review dataset compares three setups. The bars below are example numbers to show the layout; run your own notebook on a Kaggle review dataset and replace them.</p>
+<div class="demo" id="cmp">
+  <div class="lab"><span>Logistic regression on averaged Word2Vec</span></div><div class="bar"><i data-w="84">F1 0.84</i></div>
+  <div class="lab"><span>LSTM</span></div><div class="bar"><i data-w="88">F1 0.88</i></div>
+  <div class="lab"><span>Fine-tuned DistilBERT</span></div><div class="bar"><i data-w="92">F1 0.92</i></div>
+</div>
+<p>Higher scores cost more compute and are harder to explain. For a first dashboard, the simple model plus a look at its mistakes is often the better start.</p>
+
+<h2 id="fail">6. Where models still fail</h2>
+<p class="tag">Syllabus: 4.1 Discourse, 4.8 Ethics and challenges</p>
+<ul>
+<li><b>Sarcasm.</b> Try "Yeah, great, another charger that died in a week" in the analyzer above. It sees "great" and gets confused.</li>
+<li><b>Mixed opinions.</b> One review can praise the camera and slam the battery, so a single label loses information. Aspect-level analysis fixes this.</li>
+<li><b>Bias and fake reviews.</b> Models inherit the slant of their training data, and paid reviews can distort what they learn.</li>
+</ul>
+
+<h2 id="code">7. Run it yourself</h2>
+<p class="tag">Practical: pandas, scikit-learn, Hugging Face</p>
+<p>Install once with <code>pip install pandas scikit-learn transformers torch</code>. First a fast baseline on your own review CSV, which gives you the numbers for the comparison chart:</p>
+<div class="row"><button class="cp" data-t="c1">Copy</button></div>
+<pre id="c1">import pandas as pd
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report
+
+df = pd.read_csv("reviews.csv")  # columns: text, label (1 positive, 0 negative)
+X_tr, X_te, y_tr, y_te = train_test_split(df.text, df.label, test_size=0.2, random_state=42)
+vec = TfidfVectorizer(ngram_range=(1, 2), min_df=3)
+clf = LogisticRegression(max_iter=1000).fit(vec.fit_transform(X_tr), y_tr)
+print(classification_report(y_te, clf.predict(vec.transform(X_te))))</pre>
+<p>Then a pretrained transformer in three lines. This model learned from movie reviews, so fine-tune it on product reviews for the best results:</p>
+<div class="row"><button class="cp" data-t="c2">Copy</button></div>
+<pre id="c2">from transformers import pipeline
+nlp = pipeline("sentiment-analysis", model="distilbert-base-uncased-finetuned-sst-2-english")
+print(nlp(["Camera is great but the battery drains fast", "Not good at all"]))</pre>
+<h2>What to do with it</h2>
+<p>Track complaint themes by product category each week, flag sudden spikes such as "late delivery", and always sample the model's wrong answers by hand. That last step is what separates a demo from analysis you can trust.</p>
+<footer>Written by [Your Name] for the NLP course, Modules 3 and 4. Demos are simplified for teaching.</footer>
+</main>
+<script>
+const POS="great love excellent good amazing fast awesome perfect comfortable worth nice smooth best happy recommend bright sharp".split(" "),
+NEG="bad poor terrible worst slow broke broken drains waste disappointed hate cheap useless refund late damaged awful died".split(" "),
+NOT=/^(not|never|no|hardly|\w+n't)$/,BOOST=["very","really","extremely","so"];
+const $=id=>document.getElementById(id);
+function an(t){const w=t.toLowerCase().match(/[a-z']+/g)||[];let neg=0,but=1,bo=1;
+return w.map(x=>{let s=0,type="n";
+if(NOT.test(x)){neg=3;type="not"}else if(x=="but"){but=1.6;type="but"}else if(BOOST.includes(x)){bo=1.5}
+else{if(POS.includes(x))s=1;else if(NEG.includes(x))s=-1;
+if(s){s*=bo*but;bo=1;type=s>0?"pos":"neg";if(neg>0){s=-s*.8;type="flip"}}
+if(neg>0)neg--}
+return{x,s,type}})}
+const cls=s=>s>0?"pos":s<0?"neg":"";
+/* hero */
+const PRE=["Camera is great but the battery drains fast","I don't love it, the screen is not bright","Yeah, great, another charger that died in a week"];
+PRE.forEach(p=>{const b=document.createElement("button");b.textContent=p.length>32?p.slice(0,30)+"…":p;b.onclick=()=>{$("inp").value=p;run()};$("presets").append(b)});
+function run(){const t=an($("inp").value);$("chips").innerHTML="";
+t.forEach(o=>{const c=document.createElement("span");c.className="chip "+cls(o.s);c.textContent=o.x;$("chips").append(c)});
+const sc=t.reduce((a,o)=>a+o.s,0),n=Math.max(-1,Math.min(1,sc/3)),hp=t.some(o=>o.s>0),hn=t.some(o=>o.s<0);
+const f=$("fill");f.style.left=(n<0?50+n*50:50)+"%";f.style.width=Math.abs(n)*50+"%";f.style.background=n<0?"var(--neg)":"var(--pos)";
+$("verdict").textContent=!hp&&!hn?"Neutral":hp&&hn&&Math.abs(sc)<1.5?"Mixed":sc>0?"Positive":"Negative";
+const fl=t.filter(o=>o.type=="flip").map(o=>o.x);
+$("hnote").textContent=fl.length?`Negation flipped: ${fl.join(", ")}.`:(hp&&hn?"Both praise and complaint found, so a single label hides detail.":"")}
+$("inp").oninput=run;run();
+/* embeddings */
+const W=[["battery",60,60,0],["charging",95,85,0],["drains",50,105,0],["power",100,50,0],["delivery",270,50,1],["shipping",310,80,1],["late",280,110,1],["courier",325,40,1],["excellent",80,190,2],["great",120,215,2],["amazing",60,225,2],["love",130,180,2],["terrible",290,190,3],["awful",330,220,3],["worst",270,225,3],["broken",320,175,3]],
+CO=["#3b82f6","#f59e0b","#10b981","#ef4444"],svg=$("emb"),NS="http://www.w3.org/2000/svg";
+function el(n,a){const e=document.createElementNS(NS,n);for(const k in a)e.setAttribute(k,a[k]);return e}
+function pick(i){svg.querySelectorAll(".ln").forEach(l=>l.remove());const p=W[i];
+const nb=W.map((q,j)=>({j,d:Math.hypot(q[1]-p[1],q[2]-p[2])})).filter(o=>o.j!=i).sort((a,b)=>a.d-b.d).slice(0,3);
+nb.forEach(o=>{const q=W[o.j];svg.prepend(el("line",{class:"ln",x1:p[1],y1:p[2],x2:q[1],y2:q[2]}))});
+svg.querySelectorAll("circle").forEach((c,j)=>c.setAttribute("r",j==i?9:6));
+$("enote").textContent=`Closest to "${p[0]}": `+nb.map(o=>`${W[o.j][0]} (similarity ${(1-o.d/320).toFixed(2)})`).join(", ")+"."}
+W.forEach((p,i)=>{const g=el("g",{class:"pt",tabindex:0,role:"button","aria-label":p[0]});
+g.append(el("circle",{cx:p[1],cy:p[2],r:6,fill:CO[p[3]]}));const t=el("text",{x:p[1]+10,y:p[2]+4});t.textContent=p[0];g.append(t);
+g.onclick=()=>pick(i);g.onkeydown=e=>{if(e.key=="Enter"||e.key==" "){e.preventDefault();pick(i)}};svg.append(g)});pick(2);
+/* LSTM */
+const LT=an("The screen is bright but the battery is not good");let li=-1,h=0,tm=null;
+LT.forEach((o,i)=>{const c=document.createElement("span");c.className="chip";c.id="l"+i;c.textContent=o.x;$("ltoks").append(c)});
+const MSG={not:"Sees a negation word and stores a flag: the next opinion word gets flipped.",flip:"Reads an opinion word, but the negation flag flips it to the opposite.",pos:"Positive word. It is added to the memory.",neg:"Negative word. It is added to the memory.",but:"\"but\" signals that what follows matters more.",n:"Neutral word. Memory stays, fading slightly."};
+function lstep(){if(li>=LT.length-1){stop();return}
+if(li>=0)$("l"+li).classList.remove("cur");li++;const o=LT[li],c=$("l"+li);c.classList.add("cur","");
+h=Math.max(-1,Math.min(1,h*.75+o.s*.6));c.className="chip cur "+cls(o.s);
+const f=$("lfill");f.style.left=(h<0?50+h*50:50)+"%";f.style.width=Math.abs(h)*50+"%";f.style.background=h<0?"var(--neg)":"var(--pos)";
+$("lnote").textContent=`"${o.x}": `+MSG[o.type]+(li==LT.length-1?" Final memory is negative: the battery complaint wins.":"")}
+function stop(){clearInterval(tm);tm=null;$("lplay").textContent="Play"}
+$("lnext").onclick=lstep;
+$("lplay").onclick=()=>{if(tm){stop();return}$("lplay").textContent="Pause";tm=setInterval(lstep,1000)};
+$("lreset").onclick=()=>{stop();li=-1;h=0;LT.forEach((_,i)=>$("l"+i).className="chip");$("lfill").style.width="0";$("lnote").textContent='Press "Next word" to start.'};
+/* attention */
+const AT="The camera is great but the battery is not good".split(" "),
+OV={great:{camera:.55,great:.2,but:.1},good:{not:.6,battery:.2,good:.1},not:{good:.6,is:.15,battery:.1},battery:{not:.25,good:.3,is:.2,but:.1},camera:{great:.5,is:.2,The:.1}};
+function att(k){const w=AT.map((t,j)=>OV[AT[k]]?(OV[AT[k]][t]||.03):Math.exp(-Math.abs(j-k)/2));
+const s=w.reduce((a,b)=>a+b,0);document.querySelectorAll(".tok").forEach((d,j)=>{const v=w[j]/s;
+d.firstChild.style.background=`color-mix(in srgb,var(--acc) ${Math.round(v*100)}%,var(--bg))`;
+d.firstChild.style.color=v>.35?"#fff":"var(--ink)";d.lastChild.textContent=Math.round(v*100)+"%";d.firstChild.classList.toggle("on",j==k)});
+const top=w.map((v,j)=>[v,j]).filter(a=>a[1]!=k).sort((a,b)=>b[0]-a[0])[0][1];
+$("anote").textContent=`"${AT[k]}" pays most attention to "${AT[top]}".`}
+AT.forEach((t,i)=>{const d=document.createElement("div");d.className="tok";const b=document.createElement("button");b.textContent=t;b.onclick=()=>att(i);d.append(b,document.createElement("small"));$("att").append(d)});att(9);
+/* bars */
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.querySelectorAll("i").forEach(i=>i.style.width=i.dataset.w+"%");io.disconnect()}}),{threshold:.4});io.observe($("cmp"));
+/* similarity */
+const SY={drains:"bad",poor:"bad",dies:"bad",died:"bad",terrible:"bad",awful:"bad",great:"good",excellent:"good",amazing:"good",love:"good",sneakers:"shoe",shoes:"shoe",jogging:"run",running:"run",cheap:"price",affordable:"price",fast:"",life:""},SW=["the","a","is","it","very","my"];
+function cosv(a,b){const c=x=>x.reduce((m,k)=>(m[k]=(m[k]||0)+1,m),{}),A=c(a),B=c(b);let d=0;for(const k in A)d+=A[k]*(B[k]||0);const n=x=>Math.sqrt(Object.values(x).reduce((s,v)=>s+v*v,0));return n(A)&&n(B)?d/(n(A)*n(B)):0}
+function sim(){const t=x=>(x.toLowerCase().match(/[a-z']+/g)||[]).filter(w=>!SW.includes(w)),m=x=>t(x).map(w=>w in SY?SY[w]:w).filter(Boolean),
+r=cosv(t($("sa").value),t($("sb").value)),e=cosv(m($("sa").value),m($("sb").value));
+$("s1").textContent=r.toFixed(2);$("s2").textContent=e.toFixed(2);$("b1").style.width=r*100+"%";$("b2").style.width=e*100+"%"}
+$("sa").oninput=$("sb").oninput=sim;sim();
+/* NER */
+const BR="nike adidas puma samsung apple boat maybelline lakme xiaomi hp dell sony".split(" "),CL="black white red blue green grey pink navy beige".split(" ");
+function ner(){const t=$("ninp").value,o=$("nout");o.textContent="";
+const re=new RegExp("\\b("+BR.join("|")+")\\b|\\b("+CL.join("|")+")\\b|(\\bsize\\s?\\d+\\b|\\b\\d+\\s?(?:gb|tb|ml|kg|g|inch|cm)\\b|\\b(?:xs|xl|xxl)\\b)","gi");
+let last=0,m;while((m=re.exec(t))){if(m.index>last)o.append(t.slice(last,m.index));const k=m[1]?"b":m[2]?"c":"s",s=document.createElement("span");
+s.className="e e-"+k;s.append(m[0]);const sm=document.createElement("small");sm.textContent={b:"brand",c:"colour",s:"size"}[k];s.append(sm);o.append(s);last=re.lastIndex}
+o.append(t.slice(last))}
+["Boat Rockerz 450 bluetooth headphones, black","Maybelline Fit Me foundation 30 ml, beige"].forEach(p=>{const b=document.createElement("button");b.textContent=p.split(" ").slice(0,2).join(" ");b.onclick=()=>{$("ninp").value=p;ner()};$("npre").append(b)});
+$("ninp").oninput=ner;ner();
+/* chrome */
+document.querySelectorAll(".cp").forEach(b=>b.onclick=()=>{navigator.clipboard.writeText($(b.dataset.t).textContent).then(()=>{b.textContent="Copied";setTimeout(()=>b.textContent="Copy",1500)}).catch(()=>{})});
+$("theme").onclick=()=>{const r=document.documentElement,d=(r.dataset.theme||(matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light"))=="dark";r.dataset.theme=d?"light":"dark"};
+addEventListener("scroll",()=>{const h=document.documentElement;$("prog").style.width=(scrollY/Math.max(1,h.scrollHeight-innerHeight)*100)+"%"},{passive:true});
+</script>
+</body>
+</html>
